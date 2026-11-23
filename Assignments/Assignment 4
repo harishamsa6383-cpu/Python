@@ -1,0 +1,203 @@
+
+import os
+
+# Five department input files
+DEPARTMENT_FILES = [
+    "CSE.txt",
+    "IT.txt",
+    "ECE.txt",
+    "EEE.txt",
+    "MECH.txt"
+]
+
+# Output files
+MASTER_FILE = "master_list.txt"
+SUMMARY_FILE = "summary_report.txt"
+ERROR_FILE = "error_log.txt"
+
+
+# Function to validate email
+def validate_email(email):
+    email = email.strip()
+
+    if email.count("@") != 1:
+        return False
+
+    if " " in email:
+        return False
+
+    username, domain = email.split("@")
+
+    if not username or not domain:
+        return False
+
+    if "." not in domain:
+        return False
+
+    if domain.startswith(".") or domain.endswith("."):
+        return False
+
+    return True
+
+
+# Function to process registrations
+def process_registrations():
+
+    seen_register_numbers = set()
+    master_records = []
+    event_records = {}
+    errors = []
+
+    total_records = 0
+    duplicate_count = 0
+    invalid_email_count = 0
+    damaged_count = 0
+
+    for filename in DEPARTMENT_FILES:
+
+        try:
+            with open(filename, "r") as file:
+
+                for line_number, line in enumerate(file, 1):
+
+                    total_records += 1
+
+                    try:
+                        line = line.strip()
+
+                        if not line:
+                            raise ValueError("Empty line")
+
+                        # Split into five fields
+                        parts = line.split(";")
+
+                        if len(parts) < 5:
+                            raise ValueError("Damaged record")
+
+                        reg_no = parts[0].strip()
+                        name = parts[1].strip()
+                        department = parts[2].strip()
+                        email = parts[3].strip()
+                        events = [e.strip() for e in parts[4:] if e.strip()]
+
+                        if not reg_no or not name or not department or not events:
+                            raise ValueError("Missing required field")
+
+                        # Check duplicate registration
+                        if reg_no in seen_register_numbers:
+                            duplicate_count += 1
+                            errors.append(
+                                f"{filename}, Line {line_number}: Duplicate registration {reg_no}"
+                            )
+                            continue
+
+                        seen_register_numbers.add(reg_no)
+
+                        # Validate email
+                        if not validate_email(email):
+                            invalid_email_count += 1
+                            errors.append(
+                                f"{filename}, Line {line_number}: Invalid email - {email}"
+                            )
+                            continue
+
+                        # Store valid registration
+                        record = (
+                            f"{reg_no};{name};{department};"
+                            f"{email};{';'.join(events)}"
+                        )
+
+                        master_records.append(record)
+
+                        # Create event-wise lists
+                        for event in events:
+                            event_records.setdefault(event, []).append(record)
+
+                    except ValueError as e:
+                        damaged_count += 1
+                        errors.append(
+                            f"{filename}, Line {line_number}: {e}"
+                        )
+
+        except FileNotFoundError:
+            errors.append(f"Missing department file: {filename}")
+
+        except PermissionError:
+            errors.append(f"Permission denied: {filename}")
+
+        except OSError as e:
+            errors.append(f"File error in {filename}: {e}")
+
+    # Write master list
+    with open(MASTER_FILE, "w") as file:
+        file.write("Register No;Name;Department;Email;Events\n")
+
+        for record in master_records:
+            file.write(record + "\n")
+
+    # Write separate event files
+    for event, participants in event_records.items():
+
+        safe_name = "".join(
+            ch if ch.isalnum() or ch in "_-" else "_"
+            for ch in event
+        )
+
+        filename = "event_" + safe_name + ".txt"
+
+        with open(filename, "w") as file:
+            file.write("Register No;Name;Department;Email;Events\n")
+
+            for participant in participants:
+                file.write(participant + "\n")
+
+    # Write summary report
+    with open(SUMMARY_FILE, "w") as file:
+
+        file.write("COLLEGE FEST SUMMARY REPORT\n")
+        file.write("---------------------------\n")
+        file.write(f"Total records processed: {total_records}\n")
+        file.write(f"Valid registrations: {len(master_records)}\n")
+        file.write(f"Duplicate registrations: {duplicate_count}\n")
+        file.write(f"Invalid emails: {invalid_email_count}\n")
+        file.write(f"Damaged records: {damaged_count}\n")
+        file.write(f"Total events: {len(event_records)}\n")
+
+        file.write("\nEVENT-WISE PARTICIPANTS\n")
+
+        for event, participants in event_records.items():
+            file.write(
+                f"{event}: {len(participants)} participants\n"
+            )
+
+    # Write error log
+    with open(ERROR_FILE, "w") as file:
+
+        file.write("ERROR LOG\n")
+        file.write("---------\n")
+
+        if errors:
+            for error in errors:
+                file.write(error + "\n")
+        else:
+            file.write("No errors found.\n")
+
+    print("\nCOLLEGE FEST REGISTRATION COMPLETED")
+    print("-----------------------------------")
+    print("Total records:", total_records)
+    print("Valid registrations:", len(master_records))
+    print("Duplicate registrations:", duplicate_count)
+    print("Invalid emails:", invalid_email_count)
+    print("Damaged records:", damaged_count)
+    print("Events:", len(event_records))
+
+    print("\nOutput files created successfully:")
+    print("1. master_list.txt")
+    print("2. summary_report.txt")
+    print("3. error_log.txt")
+    print("4. Event-wise participant files")
+
+
+# Main function
+if __name__ == "__main__":
+    process_registrations()
