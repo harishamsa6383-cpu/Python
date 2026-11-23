@@ -1,0 +1,104 @@
+
+from decimal import Decimal
+from time import perf_counter
+
+# ORIGINAL METHOD
+def original_method(records):
+    result = {}
+    operations = 0
+
+    for record in records:
+        farmer = record["id"]
+
+        if farmer not in result:
+            total = Decimal("0")
+
+            # Repeatedly searches all records
+            for r in records:
+                operations += 1
+                if r["id"] == farmer:
+                    total += r["amount"]
+
+            result[farmer] = total
+
+    return result, operations
+
+
+# REDESIGNED METHOD
+def redesigned_method(records):
+    result = {}
+    operations = 0
+
+    # Process each record only once
+    for record in records:
+        farmer = record["id"]
+        operations += 1
+
+        if farmer not in result:
+            result[farmer] = Decimal("0")
+
+        result[farmer] += record["amount"]
+
+    return result, operations
+
+
+# MAIN PROGRAM
+records = []
+
+n = int(input("Enter number of milk records: "))
+
+for i in range(n):
+    print("\nRecord", i + 1)
+
+    farmer_id = input("Enter Farmer ID: ")
+    litres = Decimal(input("Enter milk litres: "))
+    fat = Decimal(input("Enter Fat percentage: "))
+    snf = Decimal(input("Enter SNF percentage: "))
+    shift = input("Enter shift (Morning/Evening): ")
+    rate = Decimal(input("Enter milk rate per litre: "))
+
+    amount = litres * rate
+
+    records.append({
+        "id": farmer_id,
+        "litres": litres,
+        "fat": fat,
+        "snf": snf,
+        "shift": shift,
+        "amount": amount
+    })
+
+
+# Compare both methods
+start = perf_counter()
+old_result, old_operations = original_method(records)
+old_time = perf_counter() - start
+
+start = perf_counter()
+new_result, new_operations = redesigned_method(records)
+new_time = perf_counter() - start
+
+
+# DISPLAY RESULTS
+print("\n--- ORIGINAL METHOD ---")
+for farmer, total in old_result.items():
+    print(farmer, "Total Payment:", total)
+
+print("Operations:", old_operations)
+print("Execution Time:", old_time)
+
+
+print("\n--- REDESIGNED METHOD ---")
+for farmer, total in new_result.items():
+    print(farmer, "Total Payment:", total)
+
+print("Operations:", new_operations)
+print("Execution Time:", new_time)
+
+
+# VALIDATION
+if old_result == new_result:
+    print("\nVALIDATION SUCCESSFUL")
+    print("Both methods produce the same payment.")
+else:
+    print("\nVALIDATION FAILED")
