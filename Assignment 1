@@ -1,0 +1,87 @@
+
+from decimal import Decimal, ROUND_HALF_UP
+
+# Seasonal rate details
+SUMMER_BASE_RATE = Decimal("32.00")
+SUMMER_FAT_RATE = Decimal("0.45")
+
+# Original rate card (sample values; replace with original rates)
+OTHER_BASE_RATE = Decimal("30.00")
+OTHER_FAT_RATE = Decimal("0.40")
+
+BONUS_RATE = Decimal("0.50")
+BONUS_LIMIT = Decimal("500.00")
+
+
+# Function to select the seasonal rate
+def select_rate_card(month):
+    if 4 <= month <= 6:
+        return SUMMER_BASE_RATE, SUMMER_FAT_RATE
+    else:
+        return OTHER_BASE_RATE, OTHER_FAT_RATE
+
+
+# Function to calculate milk price per litre
+def calculate_milk_rate(fat, base_rate, fat_rate):
+    rate = base_rate + (fat * fat_rate)
+    return rate.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+# Function to calculate bonus
+def calculate_bonus(total_litres):
+    if total_litres > BONUS_LIMIT:
+        return BONUS_RATE
+    else:
+        return Decimal("0.00")
+
+
+# Main function
+def main():
+    print("MILK ANALYSER SYSTEM")
+    print("--------------------")
+
+    month = int(input("Enter month (1-12): "))
+    fat = Decimal(input("Enter fat percentage: ")).quantize(
+        Decimal("0.01")
+    )
+    snf = Decimal(input("Enter SNF percentage: ")).quantize(
+        Decimal("0.01")
+    )
+    litres = Decimal(input("Enter total litres supplied in 10 days: "))
+
+    if not (1 <= month <= 12):
+        print("Invalid month!")
+        return
+
+    if fat < 0 or snf < 0 or litres < 0:
+        print("Invalid input!")
+        return
+
+    base_rate, fat_rate = select_rate_card(month)
+
+    milk_rate = calculate_milk_rate(
+        fat, base_rate, fat_rate
+    )
+
+    bonus = calculate_bonus(litres)
+
+    final_rate = milk_rate + bonus
+
+    total_amount = (final_rate * litres).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+
+    print("\n----- MILK PAYMENT DETAILS -----")
+    print("Fat Percentage:", fat)
+    print("SNF Percentage:", snf)
+    print("Total Litres:", litres)
+    print("Base Rate: Rs.", base_rate)
+    print("Fat Rate: Rs.", fat_rate)
+    print("Milk Rate per Litre: Rs.", milk_rate)
+    print("Bonus per Litre: Rs.", bonus)
+    print("Final Rate per Litre: Rs.", final_rate)
+    print("Total Payment: Rs.", total_amount)
+
+
+# Execute program
+main()
