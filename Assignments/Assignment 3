@@ -1,0 +1,176 @@
+
+import re
+from time import perf_counter
+
+
+# NORMALISE NAME
+def normalise_name(name):
+    name = name.lower().strip()
+    name = re.sub(r'^(dr|mr|mrs|ms)\.?\s+', '', name)
+    name = re.sub(r'[^a-z0-9 ]', '', name)
+    return " ".join(name.split())
+
+
+# NORMALISE PHONE NUMBER
+def normalise_phone(phone):
+    digits = re.sub(r'\D', '', phone)
+
+    if digits.startswith("0091") and len(digits) == 14:
+        digits = digits[4:]
+    elif digits.startswith("91") and len(digits) == 12:
+        digits = digits[2:]
+    elif digits.startswith("0") and len(digits) == 11:
+        digits = digits[1:]
+
+    return digits
+
+
+# MERGE CONTACTS
+def merge_contacts(contacts):
+    merged = {}
+    email_index = {}
+
+    for contact in contacts:
+        name = contact.get("name", "").strip()
+        phone = contact.get("phone", "")
+        email = contact.get("email", "")
+
+        number = normalise_phone(phone)
+        mail = email.strip().lower()
+
+        # Find existing contact
+        existing = None
+
+        if number and number in merged:
+            existing = merged[number]
+
+        if mail and mail in email_index:
+            if existing is None:
+                existing = email_index[mail]
+
+        if existing is None:
+            existing = {
+                "names": set(),
+                "numbers": set(),
+                "emails": set()
+            }
+
+        # Add contact details
+        if name:
+            existing["names"].add(name)
+
+        if number:
+            existing["numbers"].add(number)
+
+        if mail:
+            existing["emails"].add(mail)
+
+        # Update dictionary indexes
+        for num in existing["numbers"]:
+            merged[num] = existing
+
+        for em in existing["emails"]:
+            email_index[em] = existing
+
+    # Return unique contact groups
+    result = []
+    seen = set()
+
+    for contact in merged.values():
+        if id(contact) not in seen:
+            result.append(contact)
+            seen.add(id(contact))
+
+    return result
+
+
+# DISPLAY CONTACTS
+def display_contacts(result):
+    print("\n--- MERGED CONTACT LIST ---")
+
+    for i, contact in enumerate(result, 1):
+        print("\nContact:", i)
+        print("Names:", ", ".join(sorted(contact["names"])))
+        print("Phone Numbers:", ", ".join(sorted(contact["numbers"])))
+        print("Emails:", ", ".join(sorted(contact["emails"])))
+
+
+# MAIN PROGRAM
+contacts = []
+
+n = int(input("Enter number of contacts: "))
+
+for i in range(n):
+    print("\nContact", i + 1)
+
+    name = input("Enter name: ")
+    phone = input("Enter phone number (leave blank if missing): ")
+    email = input("Enter email (leave blank if missing): ")
+
+    contacts.append({
+        "name": name,
+        "phone": phone,
+        "email": email
+    })
+
+
+# MEASURE EXECUTION TIME
+start = perf_counter()
+result = merge_contacts(contacts)
+end = perf_counter()
+
+display_contacts(result)
+
+print("\nTotal Contacts Entered:", n)
+print("Unique Contacts:", len(result))
+print("Execution Time:", end - start, "seconds")
+
+
+# PERFORMANCE TEST
+def performance_test(size):
+    test_data = []
+
+    for i in range(size):
+        test_data.append({
+            "name": "Person " + str(i),
+            "phone": "98400" + str(i).zfill(5),
+            "email": "person" + str(i) + "@gmail.com"
+        })
+
+    start = perf_counter()
+    output = merge_contacts(test_data)
+    end = perf_counter()
+
+    print(size, "Contacts")
+    print("Unique Contacts:", len(output))
+    print("Time:", end - start, "seconds")
+
+
+print("\n--- PERFORMANCE ANALYSIS ---")
+
+performance_test(1000)
+performance_test(100000)
+
+
+# VALIDATION TEST
+sample = [
+    {"name": "Dr. Ravi", "phone": "+91 98400 12345",
+     "email": "ravi@gmail.com"},
+
+    {"name": "ravi kumar", "phone": "9840012345",
+     "email": "RAVI@gmail.com"},
+
+    {"name": "Priya", "phone": "9876543210",
+     "email": "priya@gmail.com"}
+]
+
+check = merge_contacts(sample)
+
+print("\n--- VALIDATION ---")
+print("Expected Unique Contacts: 2")
+print("Actual Unique Contacts:", len(check))
+
+if len(check) == 2:
+    print("Validation Successful")
+else:
+    print("Validation Failed")
