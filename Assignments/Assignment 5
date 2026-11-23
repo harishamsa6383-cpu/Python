@@ -1,0 +1,254 @@
+
+import sqlite3
+import time
+import random
+import re
+from collections import Counter
+
+# Sentiment word lists
+POSITIVE = {"good", "clean", "fast", "helpful", "improved"}
+NEGATIVE = {"bad", "dirty", "slow", "rude", "smoke", "broken"}
+NEGATORS = {"not", "never", "no"}
+
+
+# Function to calculate sentiment score
+def score(text):
+    words = re.findall(r"[a-z]+", text.lower())
+    total = 0
+    previous = ""
+
+    for word in words:
+        value = 0
+
+        if word in POSITIVE:
+            value = 1
+        elif word in NEGATIVE:
+            value = -1
+
+        if previous in NEGATORS:
+            value = -value
+
+        total += value
+        previous = word
+
+    return total
+
+
+# Function to classify complaint
+def label(text):
+    s = score(text)
+
+    if s > 0:
+        return "positive"
+    elif s < 0:
+        return "negative"
+    else:
+        return "neutral"
+
+
+# Sample complaints
+complaints = [
+    "Roads are clean and the bus was fast.",
+    "Smoke from the factory, air is bad.",
+    "The staff were not helpful.",
+    "Not bad, service improved.",
+    "The road is dirty and the bus is slow.",
+    "The service is good and staff are helpful.",
+    "The bus is broken and service is bad.",
+    "The road is clean but transport is slow.",
+    "The staff are rude and service is bad.",
+    "The transport is fast and clean."
+]
+
+# Create at least 50 complaints
+all_complaints = complaints * 5
+
+# Display sentiment results
+print("SENTIMENT ANALYSIS")
+print("------------------")
+
+for complaint in all_complaints:
+    print(f"{label(complaint):10} | {complaint}")
+
+
+# Compare with manual reading
+manual_labels = [
+    "positive",
+    "negative",
+    "negative",
+    "positive",
+    "negative",
+    "positive",
+    "negative",
+    "neutral",
+    "negative",
+    "positive"
+]
+
+correct = 0
+
+for complaint, expected in zip(complaints, manual_labels):
+    if label(complaint) == expected:
+        correct += 1
+
+agreement = (correct / len(manual_labels)) * 100
+
+print("\nMANUAL COMPARISON")
+print("-----------------")
+print("Correct predictions:", correct)
+print("Total comparisons:", len(manual_labels))
+print("Agreement:", agreement, "%")
+
+
+# Function to summarise complaints
+def summarise(texts, k=3):
+
+    stopwords = {
+        "the", "is", "was", "and", "a", "an",
+        "are", "were", "from", "but", "not",
+        "to", "of", "in", "on", "this", "it"
+    }
+
+    text = " ".join(texts)
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+
+    words = re.findall(r"[a-z]+", text.lower())
+
+    frequency = Counter(
+        word for word in words if word not in stopwords
+    )
+
+    ranked = []
+
+    for index, sentence in enumerate(sentences):
+        sentence_words = re.findall(r"[a-z]+", sentence.lower())
+
+        importance = sum(
+            frequency[word] for word in sentence_words
+        )
+
+        ranked.append((importance, index, sentence))
+
+    top_sentences = sorted(
+        ranked, key=lambda x: x[0], reverse=True
+    )[:k]
+
+    top_sentences.sort(key=lambda x: x[1])
+
+    return " ".join(item[2] for item in top_sentences)
+
+
+print("\nCOMPLAINT SUMMARY")
+print("-----------------")
+print(summarise(all_complaints, 3))
+
+
+# DATABASE OPERATIONS
+connection = sqlite3.connect(":memory:")
+cursor = connection.cursor()
+
+# Create complaint table
+cursor.execute("""
+CREATE TABLE complaints (
+    id INTEGER PRIMARY KEY,
+    station TEXT,
+    day TEXT,
+    complaint TEXT,
+    sentiment TEXT
+)
+""")
+
+# Insert 50,000 sample records
+stations = [f"Station_{i}" for i in range(1, 101)]
+
+random.seed(10)
+
+data = []
+
+for i in range(50000):
+    station = random.choice(stations)
+    day = f"2026-11-{random.randint(1, 30):02d}"
+    complaint = random.choice(complaints)
+
+    data.append((
+        station,
+        day,
+        complaint,
+        label(complaint)
+    ))
+
+cursor.executemany("""
+INSERT INTO complaints
+(station, day, complaint, sentiment)
+VALUES (?, ?, ?, ?)
+""", data)
+
+connection.commit()
+
+# Select a station and day for testing
+test_station = "Station_10"
+test_day = "2026-11-15"
+
+
+# Function to measure query time
+def measure_query():
+
+    start = time.perf_counter()
+
+    for i in range(200):
+        cursor.execute("""
+        SELECT COUNT(*)
+        FROM complaints
+        WHERE station = ? AND day = ?
+        """, (test_station, test_day))
+
+        cursor.fetchone()
+
+    end = time.perf_counter()
+
+    return (end - start) / 200
+
+
+# Measure before indexing
+before = measure_query()
+
+print("\nDATABASE PERFORMANCE")
+print("--------------------")
+print("Time before index:", before, "seconds")
+
+
+# Create composite index
+cursor.execute("""
+CREATE INDEX station_day_index
+ON complaints(station, day)
+""")
+
+connection.commit()
+
+# Measure after indexing
+after = measure_query()
+
+print("Time after index:", after, "seconds")
+
+if after > 0:
+    improvement = ((before - after) / before) * 100
+    print("Performance improvement:", round(improvement, 2), "%")
+
+
+# Display query execution plan
+print("\nQUERY EXECUTION PLAN")
+cursor.execute("""
+EXPLAIN QUERY PLAN
+SELECT COUNT(*)
+FROM complaints
+WHERE station = ? AND day = ?
+""", (test_station, test_day))
+
+for row in cursor.fetchall():
+    print(row)
+
+
+# Close database
+connection.close()
+
+print("\nPROGRAM EXECUTED SUCCESSFULLY")
